@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <title>Pipe-js Pro | Professional Engineering Solver</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- Libraries -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <style>
+      :root {
+        --primary: #2563eb;
+        --demand: #dc2626;
+        --source: #0891b2;
+        --dark: #0f172a;
+      }
+
+      html, body { height: 100vh; width: 100vw; margin: 0; padding: 0; overflow: hidden; background: #f8fafc; font-family: 'Sarabun', sans-serif; }
+      #map { position: absolute; inset: 0; z-index: 1; background: #e2e8f0; }
+
+      .ui-layer { position: relative; z-index: 1000; pointer-events: none; height: 100%; }
+      .ui-layer > * { pointer-events: auto; }
+
+      .drawer {
+        position: fixed; top: 0; left: -320px; bottom: 0; width: 320px;
+        background: rgba(255,255,255,0.95); backdrop-filter: blur(12px);
+        box-shadow: 20px 0 50px rgba(0,0,0,0.1); transition: transform 0.4s ease;
+        display: flex; flex-direction: column; z-index: 2000; border-right: 1px solid rgba(0,0,0,0.05);
+      }
+      .drawer.open { transform: translateX(320px); }
+
+      .float-btn {
+        background: white; border: 1px solid rgba(0,0,0,0.1); border-radius: 14px;
+        width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s; color: #64748b;
+      }
+      .float-btn.active { background: var(--primary); color: white; }
+
+      .label-wrapper { position: relative; width: 0; height: 0; overflow: visible; }
+
+      .eng-label-box {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.95); 
+        border: 1px solid #cbd5e1;
+        border-radius: 6px; 
+        padding: 5px 8px; 
+        font-family: 'Inter', sans-serif;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+        pointer-events: auto;
+        display: flex; flex-direction: column; gap: 1px; 
+        min-width: 105px;
+        backdrop-filter: blur(4px);
+        z-index: 10;
+      }
+
+      .lbl-row { font-size: 10px; line-height: 1.2; display: flex; justify-content: space-between; gap: 8px; }
+      .lbl-k { color: #64748b; font-weight: 500; }
+      .lbl-v { font-weight: 800; color: #0f172a; }
+      .lbl-u { font-size: 8px; color: #94a3b8; }
+
+      .prop-panel {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        width: 92%; max-width: 440px; background: white; border-radius: 24px;
+        padding: 24px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); border: 1px solid #f1f5f9; z-index: 2100;
+        max-height: 80vh; display: flex; flex-direction: column;
+      }
+
+      .eng-input {
+        width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px;
+        font-size: 14px; font-weight: 700; outline: none; transition: 0.2s;
+      }
+      .eng-input:focus { border-color: var(--primary); background: #f0f7ff; }
+
+      .node-marker { display: flex; align-items: center; justify-content: center; position: relative; }
+      
+      .panel-res-box {
+        background: #f1f5f9; border-radius: 12px; padding: 12px; margin-bottom: 16px;
+        border: 1px solid #e2e8f0;
+      }
+      .res-item { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+      .res-label { color: #64748b; font-weight: 600; }
+      .res-val { font-weight: 800; color: #0f172a; }
+
+      .system-summary {
+        position: fixed; top: 80px; right: 20px; background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(8px); border: 1px solid #cbd5e1; border-radius: 12px;
+        padding: 12px; width: 180px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        z-index: 1500; display: none; flex-direction: column; gap: 6px;
+      }
+      .system-summary.show { display: flex; }
+      .sys-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+      .sys-label { font-weight: 600; color: #64748b; }
+      .sys-val { font-weight: 800; font-family: 'Inter', sans-serif; }
+
+      /* Custom Tooltip Style สำหรับลูกศรชี้ไม่ทับเส้นท่อ */
+      .custom-eng-tooltip {
+          background: rgba(255, 255, 255, 0.95);
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-family: 'Inter', 'Sarabun', sans-serif;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+          font-size: 11px;
+          line-height: 1.4;
+          backdrop-filter: blur(4px);
+          white-space: nowrap;
+      }
+      .leaflet-tooltip-top.custom-eng-tooltip::before { border-top-color: #cbd5e1; }
+      .leaflet-tooltip-right.custom-eng-tooltip::before { border-right-color: #cbd5e1; }
+      .leaflet-tooltip-left.custom-eng-tooltip::before { border-left-color: #cbd5e1; }
+      .leaflet-tooltip-bottom.custom-eng-tooltip::before { border-bottom-color: #cbd5e1; }
+
+      /* Effect โหนดกระพริบเมื่อแรงดันตก (Low Pressure Alert) */
+      @keyframes alert-glow {
+        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+      }
+      .node-alert > div {
+        animation: alert-glow 1.5s infinite;
+        background-color: #ef4444 !important;
+      }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="ui-layer">
+        <!-- Floating Buttons -->
+        <div style="position: fixed; top: 20px; left: 20px;">
+            <button class="float-btn" onclick="toggleDrawer()"><i class="fas fa-bars text-xl"></i></button>
+        </div>
+
+        <div style="position: fixed; top: 20px; right: 20px; display: flex; gap: 10px;">
+            <button class="float-btn" onclick="forceMapFix()" title="ซ่อมแผนที่"><i class="fas fa-sync-alt"></i></button>
+            <button class="float-btn" onclick="locate()" title="ตำแหน่งของฉัน"><i class="fas fa-crosshairs"></i></button>
+            <button class="float-btn active" id="btn-res" onclick="toggleRes()" title="ซ่อน/แสดงผล"><i class="fas fa-eye"></i></button>
+        </div>
+
+        <!-- System Summary Dashboard -->
+        <div id="sysSummary" class="system-summary">
+            <h4 class="text-[10px] font-black uppercase text-slate-400 mb-1 border-b pb-1">System Status</h4>
+            <div class="sys-row">
+                <span class="sys-label">Total Supply:</span>
+                <span class="sys-val text-blue-600" id="val-supply">0</span>
+            </div>
+            <div class="sys-row">
+                <span class="sys-label">Total Demand:</span>
+                <span class="sys-val text-red-500" id="val-demand">0</span>
+            </div>
+            <div class="h-px bg-slate-100 my-1"></div>
+            <div class="sys-row">
+                <span class="sys-label">Min Pressure:</span>
+                <span class="sys-val text-orange-500" id="val-min-p">0</span>
+            </div>
+        </div>
+
+        <!-- Context Menu เมื่อคลิกที่เส้นท่อ -->
+        <div id="pipe-ctx-menu" class="hidden absolute bg-white border border-slate-200 shadow-xl rounded-xl z-[4000] p-1 text-xs font-bold text-slate-700 w-56 transition-all">
+           <div class="px-3 py-2 border-b text-[10px] text-slate-400 uppercase tracking-widest">เมนูจัดการเส้นท่อ</div>
+           <button class="w-full text-left px-3 py-2 hover:bg-blue-50 rounded-lg flex items-center gap-2 text-blue-600" onclick="openPipeProps()"><i class="fas fa-cog text-blue-500"></i> ดู/แก้ไขข้อมูลท่อ</button>
+           <div class="border-t border-slate-100 my-1"></div>
+           <button class="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg flex items-center gap-2" onclick="insertAcc('valve')"><i class="fas fa-faucet text-slate-500"></i> ติดตั้งประตูน้ำ (Valve)</button>
+           <button class="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg flex items-center gap-2" onclick="insertAcc('prv')"><i class="fas fa-compress-arrows-alt text-orange-500"></i> ติดตั้งลดแรงดัน (PRV)</button>
+           <button class="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg flex items-center gap-2" onclick="insertAcc('air_valve')"><i class="fas fa-wind text-cyan-500"></i> ติดตั้งแอร์วาล์ว (Air Valve)</button>
+           <button class="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg flex items-center gap-2" onclick="insertAcc('hydrant')"><i class="fas fa-fire-extinguisher text-red-500"></i> ติดตั้งหัวดับเพลิง (Hydrant)</button>
+        </div>
+
+        <!-- Left Drawer Menu -->
+        <div id="drawer" class="drawer">
+            <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <h2 class="text-xl font-black italic text-slate-900 tracking-tighter">PIPE-JS <span class="text-blue-600">PRO</span></h2>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">BY คนไม่สัญจร</p>
+                </div>
+                <button onclick="toggleDrawer()"><i class="fas fa-times text-slate-400"></i></button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto flex-1 space-y-6">
+                <div>
+                    <label class="text-[11px] font-bold text-slate-400 uppercase mb-3 block">เครื่องมือสร้างโครงข่าย</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="cursor-pointer flex flex-col items-center justify-center p-3 border rounded-xl bg-white" id="t-select" onclick="setMode('select')"><i class="fas fa-mouse-pointer text-slate-500 mb-1"></i><span class="text-[10px]">เลือก</span></div>
+                        <div class="cursor-pointer flex flex-col items-center justify-center p-3 border rounded-xl bg-white" id="t-junction" onclick="setMode('junction')"><i class="fas fa-dot-circle text-blue-500 mb-1"></i><span class="text-[10px]">โหนด</span></div>
+                        <div class="cursor-pointer flex flex-col items-center justify-center p-3 border rounded-xl bg-white" id="t-pipe" onclick="setMode('pipe')"><i class="fas fa-route text-slate-600 mb-1"></i><span class="text-[10px]">ท่อ</span></div>
+                        <div class="cursor-pointer flex flex-col items-center justify-center p-3 border rounded-xl bg-white" id="t-tank" onclick="setMode('tank')"><i class="fas fa-database text-purple-600 mb-1"></i><span class="text-[10px]">ถังสูง</span></div>
+                        <div class="cursor-pointer flex flex-col items-center justify-center p-3 border rounded-xl bg-white" id="t-reservoir" onclick="setMode('reservoir')"><i class="fas fa-water text-cyan-500 mb-1"></i><span class="text-[10px]">แหล่งน้ำ</span></div>
+                        <div class="cursor-pointer flex flex-col items-center justify-center p-3 border rounded-xl bg-white" id="t-pump" onclick="setMode('pump')"><i class="fas fa-fan text-red-500 mb-1"></i><span class="text-[10px]">ปั๊ม</span></div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-2xl p-1 shadow-xl">
+                    <button onclick="calculate()" class="w-full py-4 text-white font-black text-xs rounded-xl bg-blue-600 hover:bg-blue-500 flex items-center justify-center gap-3 active:scale-95 transition-all">
+                        <i class="fas fa-bolt text-yellow-300"></i> วิเคราะห์ระบบ (RUN)
+                    </button>
+                </div>
+
+                <div class="border-t pt-6">
+                    <label class="text-[11px] font-bold text-slate-400 uppercase mb-3 block">จัดการโครงการ</label>
+                    <input type="text" id="pjName" placeholder="ชื่อโครงการ..." class="w-full p-3 border rounded-xl text-sm mb-3 outline-none font-bold">
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="saveData()" class="bg-blue-50 text-blue-600 py-3 rounded-xl text-xs font-bold border border-blue-100 flex justify-center items-center" title="บันทึก"><i class="fas fa-save"></i></button>
+                        <button onclick="shareURL()" class="bg-emerald-50 text-emerald-600 py-3 rounded-xl text-xs font-bold border border-emerald-100 flex justify-center items-center gap-1"><i class="fas fa-share-alt"></i> แชร์</button>
+                        <button onclick="clearData()" class="bg-red-50 text-red-500 py-3 rounded-xl text-xs font-bold border border-red-100 flex justify-center items-center" title="ล้างหน้าจอ"><i class="fas fa-trash"></i></button>
+                    </div>
+                    <select id="pjList" onchange="loadData()" class="w-full mt-3 p-3 border rounded-xl text-xs bg-white font-bold outline-none">
+                        <option value="">-- โหลดงานที่บันทึกไว้ --</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Properties Panel -->
+        <div id="propPanel" class="hidden prop-panel">
+            <div class="flex justify-between items-center mb-5 border-b pb-4">
+                <div class="flex items-center gap-4">
+                    <div id="pIcon" class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 text-lg border border-blue-100"><i class="fas fa-cog"></i></div>
+                    <div>
+                        <h3 class="text-xs font-black uppercase text-slate-800" id="pType">Properties</h3>
+                        <p id="pId" class="text-[10px] text-slate-400 font-mono mt-1"></p>
+                    </div>
+                </div>
+                <button onclick="closeProp()"><i class="fas fa-times text-slate-300"></i></button>
+            </div>
+            <div id="pContent" class="space-y-4 overflow-y-auto px-1 flex-1"></div>
+            <div class="grid grid-cols-2 gap-3 mt-6 pt-5 border-t">
+                <button onclick="saveProp()" class="bg-blue-600 text-white py-4 rounded-xl text-[11px] font-black uppercase shadow-lg">บันทึก</button>
+                <button onclick="deleteEl()" class="bg-white border border-red-100 text-red-500 py-4 rounded-xl text-[11px] font-black uppercase"><i class="fas fa-trash"></i> ลบออก</button>
+            </div>
+        </div>
+
+        <!-- Status Message -->
+        <div id="st-msg" class="fixed bottom-4 right-4 bg-white px-4 py-1.5 rounded-full text-[10px] font-black text-slate-500 shadow-xl border border-slate-100 z-[3000]">READY</div>
+    </div>
+
+    <script>
+        // --- 1. ตัวแปรสถานะหลัก ---
+        let map, mode = 'select', nodes = [], links = [], startNodeId = null;
+        let mapItems = { m: {}, p: {} }; 
+        let showRes = true, selId = null, isCalculated = false;
+        
+        // ตัวแปรสำหรับ Context Menu อุปกรณ์ท่อ
+        let ctxPipeId = null;
+        let ctxLatLng = null;
+
+        // --- 2. ฐานข้อมูลขนาดและชนิดท่อ (ตามหลักวิศวกรรม) ---
+        const PIPE_SIZES = [15, 20, 25, 32, 40, 50, 65, 80, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700];
+        
+        const MATERIALS = [
+            { id: 'pvc', name: 'PVC / PE (พลาสติก)', c: 150, desc: 'ท่อผิวเรียบ แรงเสียดทานต่ำมาก' },
+            { id: 'steel', name: 'Steel (ท่อเหล็กใหม่)', c: 130, desc: 'ท่อเหล็กเหนียวใหม่' },
+            { id: 'di', name: 'Ductile Iron (เหล็กหล่อ)', c: 120, desc: 'ท่อเหล็กหล่อเหนียวบุซีเมนต์' },
+            { id: 'concrete', name: 'Concrete (คอนกรีต)', c: 110, desc: 'ท่อซีเมนต์หรือคอนกรีต' },
+            { id: 'galv', name: 'Galvanized (อาบสังกะสี)', c: 100, desc: 'ท่อเหล็กอาบสังกะสี (ผ่านการใช้งาน)' }
+        ];
+
+        // --- 3. เริ่มต้นการทำงาน (Initialization) ---
+        window.onload = () => { 
+            initMap(); 
+            refreshPjList(); 
+            checkUrlHash(); 
+        };
+
+        function log(t) { document.getElementById('st-msg').innerText = t.toUpperCase(); }
+
+        function initMap() {
+            map = L.map('map', { zoomControl: false, attributionControl: false, doubleClickZoom: false }).setView([14.4069, 102.8686], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+            map.on('click', (e) => {
+                document.getElementById('pipe-ctx-menu').classList.add('hidden'); // ซ่อนเมนูเมื่อคลิกพื้นหลัง
+                onMapClick(e);
+            });
+            log("System Ready");
+        }
+
+        function forceMapFix() { if(map) map.invalidateSize(); }
+
+        function setMode(m) {
+            mode = m; startNodeId = null;
+            document.querySelectorAll('.cursor-pointer').forEach(el => el.classList.remove('border-blue-500','bg-blue-50'));
+            const target = document.getElementById('t-'+m);
+            if(target) target.classList.add('border-blue-500','bg-blue-50');
+            closeProp();
+        }
+
+        function toggleDrawer() { document.getElementById('drawer').classList.toggle('open'); setTimeout(forceMapFix, 400); }
+
+        // --- 4. การจัดการคลิกบนแผนที่ (สร้าง Node) ---
+        async function onMapClick(e) {
+            if(mode === 'select') { closeProp(); return; }
+            if(['junction','tank','reservoir','pump'].includes(mode)) {
+                log("Fetching Elevation...");
+                let el = 100;
+                try {
+                    // ดึงระดับความสูงจาก API ฟรี (ถ้ามีเน็ต)
+                    const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${e.latlng.lat}&longitude=${e.latlng.lng}`);
+                    const d = await res.json();
+                    if(d.elevation) el = d.elevation[0];
+                } catch(err) {}
+
+                const id = mode[0].toUpperCase() + Date.now().toString().slice(-4);
+                nodes.push({ 
+                    id, type: mode, lat: e.latlng.lat, lng: e.latlng.lng, 
+                    el, dem: 0, head: 0, p: 0, status: 'OPEN', 
+                    setting: 15.0, waterLevel: 20, pumpHead: 30, pumpFlow: 100,
+                    prvSize: 100 // Default PRV size
+                });
+                render(); log("Ready");
+            }
+        }
+
+        // --- 5. ฟังก์ชันแสดงผลบนแผนที่ (Render & UI) ---
+        function render() {
+            if(!map) return;
+            // ล้างของเก่า
+            for(let k in mapItems.m) map.removeLayer(mapItems.m[k]);
+            for(let k in mapItems.p) map.removeLayer(mapItems.p[k]);
+            
+            // วาดท่อ
+            links.forEach(l => {
+                const n1 = nodes.find(n=>n.id===l.s), n2 = nodes.find(n=>n.id===l.e);
+                if(n1 && n2) {
+                    let pipeColor = '#94a3b8'; // สีเทา (ยังไม่คำนวณ)
+                    if (isCalculated) {
+                        const vel = Math.abs(l.vel || 0); // ใช้ค่าสมบูรณ์ในการเทียบสี
+                        if (Math.abs(l.flow) > 0.0001) {
+                            if (vel < 0.6) pipeColor = '#60a5fa';      // ฟ้า (ช้า)
+                            else if (vel < 1.5) pipeColor = '#22c55e'; // เขียว (ดีมาก)
+                            else if (vel < 2.5) pipeColor = '#f59e0b'; // ส้ม (เร็วไป)
+                            else pipeColor = '#ef4444';                // แดง (อันตราย)
+                        }
+                    }
+                    let weight = (Math.abs(l.flow) > 0.0001 && isCalculated) ? 6 : 4;
+                    const poly = L.polyline([[n1.lat,n1.lng],[n2.lat,n2.lng]], { color: pipeColor, weight, opacity: 0.8 }).addTo(map);
+                    
+                    // Tooltip สำหรับเส้นท่อ
+                    let tooltipHtml = `<div style="text-align:left;">`;
+                    tooltipHtml += `<b><i class="fas fa-ruler-horizontal text-slate-400"></i> Dia:</b> ${l.dia} mm<br>`;
+                    if (isCalculated) {
+                        // แสดงสถานะการไหลย้อน (Reverse Flow) ตามหลักฟิสิกส์
+                        const flowText = l.flow < 0 ? '<span style="color:#ef4444;font-size:9px;">(ไหลย้อน)</span>' : '';
+                        tooltipHtml += `<span style="color:#2563eb;"><b><i class="fas fa-water"></i> Q:</b> ${Math.abs(l.flow || 0).toFixed(2)} m³/h ${flowText}</span><br>`;
+                        tooltipHtml += `<span style="color:#9333ea;"><b><i class="fas fa-tachometer-alt"></i> V:</b> ${Math.abs(l.vel || 0).toFixed(2)} m/s</span><br>`;
+                        tooltipHtml += `<span style="color:#ef4444;"><b><i class="fas fa-arrow-down"></i> HL:</b> ${(l.hl || 0).toFixed(3)} m</span>`;
+                    }
+                    tooltipHtml += `</div>`;
+                    
+                    // ปรับให้ป้ายข้อมูลท่อแสดงเมื่อจิ้มหรือชี้ แม้จะปิดการมองเห็นภาพรวม (showRes = false)
+                    poly.bindTooltip(tooltipHtml, { permanent: showRes, direction: 'center', className: 'custom-eng-tooltip' });
+
+                    // เมื่อคลิกที่เส้นท่อ จะเปิด Context Menu ขึ้นมา
+                    poly.on('click', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        ctxPipeId = l.id;
+                        ctxLatLng = e.latlng;
+                        const menu = document.getElementById('pipe-ctx-menu');
+                        menu.style.left = e.originalEvent.pageX + 'px';
+                        menu.style.top = e.originalEvent.pageY + 'px';
+                        menu.classList.remove('hidden');
+                    });
+
+                    mapItems.p[l.id] = poly;
+                }
+            });
+
+            // วาด Node
+            nodes.forEach(n => {
+                let iconHtml = '';
+                let dotColor = n.dem > 0 ? '#dc2626' : '#3b82f6';
+                const isClosed = n.status === 'CLOSED';
+                let isLowPressure = false;
+                let p_bar = 0;
+
+                // เช็คแรงดัน (แปลงค่า Head เป็น Bar: 1 bar ≈ 10.197 mH2O)
+                if (isCalculated && !['reservoir','tank'].includes(n.type)) {
+                    p_bar = (n.p || 0) / 10.197;
+                    if (p_bar <= 0) { dotColor = '#ef4444'; isLowPressure = true; }
+                    else if (p_bar < 0.5) { dotColor = '#ef4444'; isLowPressure = true; } // ต่ำกว่า 0.5 bar ให้กระพริบเตือนสีแดง
+                    else if (p_bar < 1.0) { dotColor = '#f97316'; } // ต่ำกว่า 1.0 bar เตือนสีส้ม
+                    else { dotColor = '#22c55e'; }              
+                }
+
+                // เลือก Icon
+                if(['tank','reservoir','pump'].includes(n.type)) {
+                    const icon = n.type==='tank' ? 'fa-database text-purple-600' : (n.type==='reservoir' ? 'fa-water text-cyan-500' : 'fa-fan text-orange-500');
+                    iconHtml = `<i class="fas ${icon} text-xl drop-shadow-md bg-white rounded-full p-1 border"></i>`;
+                } else if(['valve','prv', 'air_valve', 'hydrant'].includes(n.type)) {
+                    let icon = ''; let color = '';
+                    if(n.type==='valve') { 
+                        icon = 'fa-faucet'; 
+                        let pct = n.openPercent !== undefined ? n.openPercent : (n.status === 'CLOSED' ? 0 : 100);
+                        if (pct === 0) color = '#ef4444'; // แดง (ปิดสนิท)
+                        else if (pct < 100) color = '#f59e0b'; // ส้ม (หรี่วาล์ว)
+                        else color = '#22c55e'; // เขียว (เปิดเต็มที่)
+                    }
+                    else if(n.type==='prv') { icon = 'fa-compress-arrows-alt'; color = '#f97316'; }
+                    else if(n.type==='air_valve') { icon = 'fa-wind'; color = '#06b6d4'; }
+                    else if(n.type==='hydrant') { icon = 'fa-fire-extinguisher'; color = '#ef4444'; }
+                    iconHtml = `<div class="node-marker"><i class="fas ${icon} text-xl drop-shadow-md" style="color:${color}"></i></div>`;
+                } else {
+                    iconHtml = `<div class="node-marker ${isLowPressure ? 'node-alert' : ''}"><div style="width:14px;height:14px;background:${dotColor};border:2px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div></div>`;
+                }
+
+                const m = L.marker([n.lat, n.lng], { icon: L.divIcon({className:'flex justify-center items-center', html: iconHtml, iconSize:[30,30]}) }).addTo(map);
+                
+                // Tooltip สำหรับ Node (แสดงเฉพาะ Elev, Press, Head และ Demand ถ้ามี)
+                let nodeContent = '';
+                
+                if (n.type === 'valve') {
+                    let pct = n.openPercent !== undefined ? n.openPercent : (n.status === 'CLOSED' ? 0 : 100);
+                    let vColor = pct === 0 ? '#ef4444' : (pct < 100 ? '#ea580c' : '#22c55e');
+                    nodeContent += `<span style="color:${vColor};"><b>Valve Open:</b> ${pct}%</span><br>`;
+                } else if (n.type === 'prv') {
+                    nodeContent += `<span style="color:#f97316;"><b>PRV Set:</b> ${n.setting} m</span><br>`;
+                }
+                
+                // แสดงค่า Demand เฉพาะจุดที่มีการตั้งค่าปริมาณใช้น้ำมากกว่า 0
+                if (n.dem && n.dem > 0) {
+                    nodeContent += `<span style="color:#dc2626;"><b><i class="fas fa-hand-holding-water"></i> Dem:</b> ${n.dem.toFixed(2)} m³/h</span><br>`;
+                }
+                
+                nodeContent += `<span style="color:#475569;"><b><i class="fas fa-mountain text-slate-400"></i> Elev:</b> ${n.el.toFixed(2)} m</span><br>`;
+                
+                if (isCalculated && !['valve','air_valve'].includes(n.type)) {
+                    nodeContent += `<span style="color:#ea580c;"><b><i class="fas fa-compress text-orange-500"></i> Press:</b> ${p_bar.toFixed(2)} bar</span><br>`;
+                    nodeContent += `<span style="color:#059669;"><b><i class="fas fa-layer-group text-emerald-500"></i> Head:</b> ${(n.head || 0).toFixed(2)} m</span><br>`;
+                }
+                
+                // ตัด <br> ตัวท้ายสุดออกเพื่อความสวยงาม
+                if (nodeContent.endsWith('<br>')) {
+                    nodeContent = nodeContent.slice(0, -4);
+                }
+                
+                // ปรับให้ป้ายข้อมูลโหนดแสดงเมื่อจิ้มหรือชี้ แม้จะปิดการมองเห็นภาพรวม (showRes = false)
+                if (nodeContent !== '') {
+                    let nodeHtml = `<div style="text-align:left;">${nodeContent}</div>`;
+                    m.bindTooltip(nodeHtml, { permanent: showRes, direction: 'right', className: 'custom-eng-tooltip' });
+                }
+
+                m.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    document.getElementById('pipe-ctx-menu').classList.add('hidden');
+                    if(mode === 'pipe') handlePipe(n.id);
+                    else openProp(n.id, 'node');
+                });
+                mapItems.m[n.id] = m;
+            });
+        }
+
+        // ฟังก์ชันช่วยเปิด Properties จากเมนู
+        function openPipeProps() {
+            document.getElementById('pipe-ctx-menu').classList.add('hidden');
+            if(ctxPipeId) openProp(ctxPipeId, 'link');
+        }
+
+        // ฟังก์ชันสำหรับตัดเส้นท่อและแทรกอุปกรณ์
+        function insertAcc(type) {
+            document.getElementById('pipe-ctx-menu').classList.add('hidden');
+            if(!ctxPipeId || !ctxLatLng) return;
+
+            const pipe = links.find(p => p.id === ctxPipeId);
+            if(!pipe) return;
+
+            // ตั้งชื่อ ID ให้เหมาะสมกับอุปกรณ์
+            let prefix = 'V';
+            if (type === 'prv') prefix = 'PRV';
+            if (type === 'air_valve') prefix = 'AV';
+            if (type === 'hydrant') prefix = 'HYD';
+            
+            const nId = prefix + Date.now().toString().slice(-4);
+            const sNode = nodes.find(n => n.id === pipe.s);
+            const el = sNode ? sNode.el : 10;
+
+            const newNode = {
+                id: nId, type: type, lat: ctxLatLng.lat, lng: ctxLatLng.lng,
+                el: el, dem: type === 'hydrant' ? 10 : 0, head: 0, p: 0,
+                status: 'OPEN', setting: 15.0, prvSize: pipe.dia || 100, openPercent: 100
+            };
+            nodes.push(newNode);
+
+            // แบ่งครึ่งเส้นท่อตามพิกัดและลดความยาวท่อลงครึ่งหนึ่งตามหลักวิศวกรรม
+            const p1 = { ...pipe, id: 'L'+Date.now().toString().slice(-4)+'A', e: nId, len: Math.max(pipe.len / 2, 0.1) };
+            const p2 = { ...pipe, id: 'L'+Date.now().toString().slice(-4)+'B', s: nId, len: Math.max(pipe.len / 2, 0.1) };
+
+            links = links.filter(p => p.id !== ctxPipeId);
+            links.push(p1, p2);
+
+            ctxPipeId = null;
+            ctxLatLng = null;
+
+            isCalculated = false;
+            render();
+        }
+        
+        // --- 6. หน้าต่าง Properties (ข้อมูลท่อ/โหนด และ Dropdown ชนิดท่อ) ---
+        function updateMaterialInfo() {
+            const cValueInput = document.getElementById('i_cvalue');
+            const matDesc = document.getElementById('mat_desc');
+            
+            if(cValueInput && matDesc) {
+                const val = parseFloat(cValueInput.value);
+                const matchedMat = MATERIALS.find(m => m.c === val);
+                if(matchedMat) {
+                    matDesc.innerText = `💡 ${matchedMat.name} - ${matchedMat.desc}`;
+                } else {
+                    matDesc.innerText = `💡 กำหนดค่า C-Factor เอง (${val || 0})`;
+                }
+            }
+        }
+        
+        function updatePRVInfo() {
+            const sizeInput = document.getElementById('i_prv_size');
+            const flowSpan = document.getElementById('prv_max_flow');
+            const szLbl = document.getElementById('prv_sz_lbl');
+            if(sizeInput && flowSpan && szLbl) {
+                const sz = parseFloat(sizeInput.value);
+                if(isNaN(sz)) return;
+                szLbl.innerText = sz;
+                const d = sz / 1000;
+                const maxFlow = (Math.PI * Math.pow(d/2, 2)) * 2.5 * 3600; // คำนวณที่ V = 2.5 m/s
+                flowSpan.innerText = maxFlow.toFixed(1);
+            }
+        }
+
+        function openProp(id, type) {
+            selId = id;
+            const el = type==='node' ? nodes.find(n=>n.id===id) : links.find(l=>l.id===id);
+            if (!el) return;
+            document.getElementById('propPanel').classList.remove('hidden');
+            document.getElementById('pId').innerText = id;
+            const box = document.getElementById('pContent');
+            
+            let resHtml = '';
+            if (isCalculated) {
+                if(type === 'node') {
+                    const p_bar_val = (el.p || 0) / 10.197;
+                    resHtml = `<div class="panel-res-box"><div class="res-item"><span class="res-label">Total Head:</span><span class="res-val">${(el.head||0).toFixed(2)} m</span></div><div class="res-item"><span class="res-label">Pressure:</span><span class="res-val text-blue-600">${p_bar_val.toFixed(2)} bar</span></div></div>`;
+                } else {
+                    resHtml = `<div class="panel-res-box"><div class="res-item"><span class="res-label">Flow Rate:</span><span class="res-val text-blue-600">${Math.abs(el.flow||0).toFixed(2)} m³/h</span></div><div class="res-item"><span class="res-label">Velocity:</span><span class="res-val text-purple-600">${Math.abs(el.vel||0).toFixed(2)} m/s</span></div><div class="res-item"><span class="res-label">Headloss:</span><span class="res-val text-red-500">${(el.hl||0).toFixed(2)} m</span></div></div>`;
+                }
+            }
+            
+            if(type === 'node') {
+                document.getElementById('pType').innerText = el.type.toUpperCase();
+                let h = resHtml + `<div><label class="text-[10px] text-slate-400 font-bold uppercase">Elevation (ระดับดิน MSL)</label><input id="i_el" type="number" step="0.1" value="${el.el.toFixed(1)}" class="eng-input"></div>`;
+                
+                if(['valve'].includes(el.type)) {
+                    let currentPct = el.openPercent !== undefined ? el.openPercent : (el.status === 'CLOSED' ? 0 : 100);
+                    let openOpts = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(v => 
+                        `<option value="${v}" ${currentPct == v ? 'selected' : ''}>${v}% ${v===0?'(ปิดสนิท)':v===100?'(เปิดเต็มที่)':''}</option>`
+                    ).join('');
+                    
+                    h += `<div class="mt-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100 shadow-inner">
+                            <label class="text-[10px] text-blue-700 font-bold uppercase">Valve Opening (หรี่วาล์ว %)</label>
+                            <select id="i_valve_open" class="eng-input border-blue-200 bg-white mt-2">
+                                ${openOpts}
+                            </select>
+                            <p class="text-[9px] text-slate-500 mt-2 leading-relaxed">💡 <b>วิศวกรรมการหรี่วาล์ว:</b> การลดเปอร์เซ็นต์การเปิด จะเพิ่ม Headloss แบบทวีคูณและจำกัด Flow ในระบบโครงข่าย</p>
+                          </div>`;
+                }
+                
+                if(el.type === 'prv') {
+                    const currentPrvSize = el.prvSize || 100;
+                    // สร้าง Dropdown ขนาดท่อมาตรฐาน 40mm - 600mm
+                    let prvSizeOpts = PIPE_SIZES.filter(s => s >= 40 && s <= 600).map(s => `<option value="${s}" ${currentPrvSize==s?'selected':''}>${s} mm</option>`).join('');
+                    const initMaxFlow = ((Math.PI * Math.pow(currentPrvSize/2000, 2)) * 2.5 * 3600).toFixed(1);
+
+                    h += `<div class="mt-4 bg-orange-50/50 p-4 rounded-xl border border-orange-100 shadow-inner">
+                            <div class="grid grid-cols-2 gap-3 mb-3">
+                                <div>
+                                    <label class="text-[10px] text-orange-600 font-bold uppercase">Target Pressure (m)</label>
+                                    <input id="i_set" type="number" step="0.1" value="${el.setting||15.0}" class="eng-input border-orange-200 bg-white">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-orange-600 font-bold uppercase">PRV Size (ขนาดวาล์ว)</label>
+                                    <select id="i_prv_size" class="eng-input border-orange-200 bg-white" onchange="updatePRVInfo()">
+                                        ${prvSizeOpts}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg border border-orange-100">
+                                <p class="text-[10px] text-orange-600 leading-relaxed text-justify">
+                                    <b>ทฤษฎีการใช้งาน:</b> ควรเลือกขนาด PRV ให้เล็กกว่าท่อเมนหลัก 1-2 ระดับ เพื่อให้วาล์วเปิดอยู่ในช่วงที่เหมาะสม ป้องกันการเกิด <b>Cavitation</b> และลดปัญหา <b>Hunting</b> (วาล์วเปิด-ปิดแกว่งไปมา)
+                                </p>
+                                <hr class="my-2 border-orange-100">
+                                <p class="text-[10px] text-slate-600">
+                                    💡 ขนาด <span id="prv_sz_lbl" class="font-bold text-blue-600">${currentPrvSize}</span> mm รองรับ Flow สูงสุด ~<span id="prv_max_flow" class="font-black text-blue-600 text-xs">${initMaxFlow}</span> m³/h <br><span class="text-[8px] text-slate-400">(คำนวณที่ความเร็วปลอดภัย V = 2.5 m/s)</span>
+                                </p>
+                            </div>
+                          </div>`;
+                }
+                else if(el.type === 'pump') {
+                    h += `<div class="mt-4 grid grid-cols-2 gap-2">
+                        <div><label class="text-[10px] text-orange-500 font-bold uppercase">Pump Head (m)</label><input id="i_pump_head" type="number" step="0.1" value="${el.pumpHead||30.0}" class="eng-input border-orange-100 bg-orange-50"></div>
+                        <div><label class="text-[10px] text-orange-500 font-bold uppercase">Design Flow (m³/h)</label><input id="i_pump_flow" type="number" step="1" value="${el.pumpFlow||100.0}" class="eng-input border-orange-100 bg-orange-50"></div>
+                    </div>`;
+                }
+                else if(['reservoir','tank'].includes(el.type)) h += `<div class="mt-4"><label class="text-[10px] text-cyan-600 font-bold uppercase">Water Level (m)</label><input id="i_wl" type="number" step="0.1" value="${el.waterLevel||10.0}" class="eng-input border-cyan-100 bg-cyan-50"></div>`;
+                else h += `<div class="mt-4"><label class="text-[10px] text-red-500 font-bold uppercase">Base Demand (m³/h)</label><input id="i_dem" type="number" step="0.1" value="${el.dem}" class="eng-input border-red-100"></div>`;
+                
+                box.innerHTML = h;
+            } else {
+                document.getElementById('pType').innerText = "PIPE DETAILS";
+                
+                let sizeOpts = PIPE_SIZES.map(s => `<option value="${s}" ${el.dia==s?'selected':''}>${s} mm</option>`).join('');
+                
+                // Datalist สำหรับค่า C (รองรับการเลือกและพิมพ์เอง)
+                let cOpts = MATERIALS.map(m => `<option value="${m.c}">${m.name} (C=${m.c})</option>`).join('');
+                const currentC = el.c || 150;
+                const matchedMat = MATERIALS.find(m => m.c === currentC);
+                const initDesc = matchedMat ? `${matchedMat.name} - ${matchedMat.desc}` : `กำหนดค่า C-Factor เอง (${currentC})`;
+
+                let h = resHtml + `
+                <div class="mb-4">
+                    <label class="text-[10px] text-slate-400 font-bold uppercase">ขนาดเส้นผ่านศูนย์กลาง (Diameter)</label>
+                    <select id="i_dia" class="eng-input bg-white mb-3">${sizeOpts}</select>
+                    
+                    <label class="text-[10px] text-slate-400 font-bold uppercase text-blue-600">ค่า C-Factor (เลือกหรือพิมพ์เองได้)</label>
+                    <input id="i_cvalue" type="number" list="cvalue-list" class="eng-input bg-blue-50 border-blue-200" value="${currentC}" oninput="updateMaterialInfo()" placeholder="พิมพ์ค่า C หรือเลือกจากรายการ">
+                    <datalist id="cvalue-list">${cOpts}</datalist>
+                    <p id="mat_desc" class="text-[10px] text-blue-600 mt-1 font-bold">💡 ${initDesc}</p>
+                    
+                    <div class="mt-3">
+                        <label class="text-[10px] text-slate-400 font-bold uppercase">ความยาวจริง (Length: m)</label>
+                        <input id="i_len" type="number" value="${Math.round(el.len)}" class="eng-input">
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50/60 p-4 rounded-xl mt-4 border border-blue-100 shadow-inner">
+                    <h4 class="text-[10px] font-black text-blue-800 uppercase mb-2 flex items-center gap-1"><i class="fas fa-graduation-cap"></i> ทฤษฎีพลศาสตร์ของไหล</h4>
+                    <ul class="text-[9px] text-slate-600 leading-relaxed list-disc pl-3 space-y-1">
+                        <li><b>Major Loss:</b> ใช้สมการ <span class="text-blue-600 font-bold">Hazen-Williams</span> เป็นมาตรฐานหลักงานประปา</li>
+                        <li><b>Minor Loss:</b> ผสาน <span class="text-orange-600 font-bold">Darcy-Weisbach</span> ($K_m \\frac{V^2}{2g}$) เพื่อความแม่นยำเมื่อหรี่วาล์วและคำนวณ Flow Rate</li>
+                        <li><b>Reference:</b> สมการ <span class="text-purple-600 font-bold">Prony</span> เป็นทฤษฎีรากฐานแห่งการสูญเสียแรงเสียดทานที่ถูกต่อยอดมาสู่ระบบนี้</li>
+                    </ul>
+                </div>`;
+                box.innerHTML = h;
+            }
+        }
+
+        function toggleStatus() { const el = nodes.find(n=>n.id===selId); if (el) { el.status = el.status==='OPEN'?'CLOSED':'OPEN'; openProp(selId, 'node'); render(); } }
+        
+        // แปลงฟังก์ชันให้เป็นแบบ Asynchronous เพื่อรอให้ระบบคำนวณเสร็จก่อนแสดงผล
+        async function saveProp() {
+            const isN = nodes.some(n=>n.id===selId);
+            const el = isN ? nodes.find(n=>n.id===selId) : links.find(l=>l.id===selId);
+            if (!el) return;
+            if(isN) {
+                const elInput = document.getElementById('i_el'); if (elInput) el.el = parseFloat(elInput.value);
+                const setInput = document.getElementById('i_set'); if (setInput) el.setting = parseFloat(setInput.value);
+                const prvSizeInput = document.getElementById('i_prv_size'); if (prvSizeInput) el.prvSize = parseFloat(prvSizeInput.value);
+                const valveOpenInput = document.getElementById('i_valve_open'); 
+                if (valveOpenInput) {
+                    el.openPercent = parseInt(valveOpenInput.value);
+                    el.status = el.openPercent === 0 ? 'CLOSED' : 'OPEN';
+                }
+                const wlInput = document.getElementById('i_wl'); if (wlInput) el.waterLevel = parseFloat(wlInput.value);
+                const demInput = document.getElementById('i_dem'); if (demInput) el.dem = parseFloat(demInput.value);
+                
+                const pH = document.getElementById('i_pump_head'); if(pH) el.pumpHead = parseFloat(pH.value);
+                const pF = document.getElementById('i_pump_flow'); if(pF) el.pumpFlow = parseFloat(pF.value);
+            } else {
+                const diaInput = document.getElementById('i_dia'); if (diaInput) el.dia = parseFloat(diaInput.value);
+                const lenInput = document.getElementById('i_len'); if (lenInput) el.len = parseFloat(lenInput.value);
+                const cInput = document.getElementById('i_cvalue'); if (cInput) el.c = parseFloat(cInput.value); // รับค่า C จาก Input (ที่พิมพ์เองหรือเลือก)
+            }
+            closeProp(); 
+            await calculate(); // สั่งให้วิเคราะห์อัตโนมัติเมื่อกดบันทึกแก้ไขข้อมูล
+            render();
+        }
+
+        function closeProp() { document.getElementById('propPanel').classList.add('hidden'); selId = null; }
+        
+        async function deleteEl() { 
+            nodes = nodes.filter(n=>n.id!==selId); 
+            links = links.filter(l=>l.id!==selId && l.s!==selId && l.e!==selId); 
+            closeProp(); 
+            await calculate(); // สั่งให้วิเคราะห์อัตโนมัติเมื่อลบท่อหรือโหนดทิ้ง
+            render(); 
+        }
+        
+        function handlePipe(id) {
+            if(!startNodeId) { startNodeId = id; log("Select Destination"); }
+            else {
+                if(startNodeId !== id) {
+                    const n1 = nodes.find(n=>n.id===startNodeId);
+                    const n2 = nodes.find(n=>n.id===id);
+                    if (n1 && n2) {
+                        const d = L.latLng(n1.lat, n1.lng).distanceTo(L.latLng(n2.lat, n2.lng));
+                        links.push({ id: 'L'+Date.now().toString().slice(-4), s: startNodeId, e: id, len: d, dia: 100, mat: 'pvc', c: 150, flow: 0, vel: 0, hl: 0 });
+                        render();
+                    }
+                }
+                startNodeId = null; log("Ready");
+            }
+        }
+        
+        // --- 7. การบันทึกและแชร์ข้อมูล ---
+        async function saveData() { 
+            const n = document.getElementById('pjName').value; 
+            if(!n) return alert("ระบุชื่อโครงการ"); 
+            
+            await calculate(); // สั่งวิเคราะห์ข้อมูลให้สมบูรณ์แบบก่อนเซฟโปรเจกต์ลงฐานข้อมูล
+            
+            localStorage.setItem('pj_'+n, JSON.stringify({nodes, links})); 
+            refreshPjList(); 
+            alert("บันทึกข้อมูลและวิเคราะห์ระบบเรียบร้อยแล้ว"); 
+            render();
+        }
+        function refreshPjList() { const sel = document.getElementById('pjList'); sel.innerHTML = '<option value="">-- Load Project --</option>'; for(let i=0; i<localStorage.length; i++) { const k = localStorage.key(i); if(k.startsWith('pj_')) sel.innerHTML += `<option value="${k}">${k.replace('pj_','')}</option>`; } }
+        function loadData() { 
+            const k = document.getElementById('pjList').value; if(!k) return; 
+            const d = JSON.parse(localStorage.getItem(k)); if(d) { nodes = d.nodes; links = d.links; calculate().then(() => { render(); log("Loaded"); }); } 
+        }
+        function clearData() { if(confirm("ต้องการล้างหน้าจอทั้งหมดหรือไม่?")) { nodes=[]; links=[]; isCalculated=false; render(); } }
+
+        function shareURL() {
+            if(nodes.length === 0) return alert("ไม่มีข้อมูล");
+            try {
+                const dataStr = JSON.stringify({nodes, links});
+                const encoded = btoa(encodeURIComponent(dataStr));
+                const url = window.location.origin + window.location.pathname + '#' + encoded;
+                const el = document.createElement('textarea');
+                el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+                alert("คัดลอกลิงก์เรียบร้อยแล้ว ส่งให้เพื่อนได้เลย!");
+            } catch(e) { alert("เกิดข้อผิดพลาด"); }
+        }
+
+        function checkUrlHash() {
+            if(window.location.hash && window.location.hash.length > 5) {
+                try {
+                    const decoded = decodeURIComponent(atob(window.location.hash.substring(1)));
+                    const data = JSON.parse(decoded);
+                    if(data && data.nodes && data.links) {
+                        nodes = data.nodes; links = data.links;
+                        if(nodes.length > 0 && map) map.setView([nodes[0].lat, nodes[0].lng], 16);
+                        calculate().then(() => { render(); });
+                        window.history.replaceState(null, null, ' '); // Clean URL
+                    }
+                } catch(e) {}
+            }
+        }
+
+        function toggleRes() { showRes = !showRes; render(); }
+        function locate() { 
+            if(!navigator.geolocation) return alert("ไม่รองรับ GPS");
+            navigator.geolocation.getCurrentPosition(
+                pos => map.setView([pos.coords.latitude, pos.coords.longitude], 18),
+                err => alert("หาตำแหน่งไม่พบ"),
+                { enableHighAccuracy: true }
+            );
+        }
+
+        // --- 8. ระบบคำนวณวิศวกรรม (Hazen-Williams Calculation Engine) ---
+        function calculate() {
+            log("Computing...");
+            isCalculated = false;
+            
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const sources = nodes.filter(n => ['reservoir','tank','pump'].includes(n.type));
+                    if(sources.length === 0) { alert("กรุณาระบุแหล่งจ่ายน้ำ (Reservoir/Tank) หรือปั๊ม"); resolve(); return; }
+
+                    // --- ส่วนเพิ่มใหม่: วิเคราะห์การเชื่อมต่อของกราฟ (Graph Connectivity Analysis - BFS) ---
+                    // ป้องกันไม่ให้จุดที่ถูกตัดขาดจากแหล่งน้ำ (โดนวาล์วปิดหัวท้าย) มีการคำนวณ Flow แบบหลอกๆ
+                    const adj = {};
+                    nodes.forEach(n => adj[n.id] = []);
+                    links.forEach(l => {
+                        const n1 = nodes.find(x => x.id === l.s);
+                        const n2 = nodes.find(x => x.id === l.e);
+                        if(n1 && n2) {
+                            let pct1 = n1.type === 'valve' ? (n1.openPercent !== undefined ? n1.openPercent : (n1.status === 'CLOSED' ? 0 : 100)) : 100;
+                            let pct2 = n2.type === 'valve' ? (n2.openPercent !== undefined ? n2.openPercent : (n2.status === 'CLOSED' ? 0 : 100)) : 100;
+                            
+                            // ถ้าวาล์วไม่ได้ปิดสนิททั้งสองฝั่ง ให้ถือว่าท่อเส้นนี้เชื่อมต่อกัน
+                            if (pct1 > 0 && pct2 > 0) {
+                                adj[l.s].push(l.e);
+                                adj[l.e].push(l.s);
+                            }
+                        }
+                    });
+
+                    const connectedNodes = new Set();
+                    const queue = sources.map(s => s.id);
+                    queue.forEach(id => connectedNodes.add(id));
+
+                    let headIdx = 0;
+                    while(headIdx < queue.length) {
+                        const curr = queue[headIdx++];
+                        adj[curr].forEach(neighbor => {
+                            if (!connectedNodes.has(neighbor)) {
+                                connectedNodes.add(neighbor);
+                                queue.push(neighbor);
+                            }
+                        });
+                    }
+                    // ---------------------------------------------------------------------------------
+
+                    // กำหนด Head เริ่มต้น
+                    sources.forEach(s => { 
+                        s.head = s.el + (s.type === 'pump' ? (s.pumpHead || 50) : (s.waterLevel || 10)); 
+                    });
+                    
+                    nodes.forEach(n => { 
+                        if(!['reservoir','tank','pump'].includes(n.type)) {
+                            // ถ้าเชื่อมต่อกับแหล่งน้ำ ให้เดา Head เริ่มต้น แต่ถ้าถูกตัดขาด Head = Elevation (Pressure = 0)
+                            n.head = connectedNodes.has(n.id) ? n.el + 10 : n.el;
+                        }
+                    });
+
+                    // Algorithm จำลองแรงดันเบื้องต้น (Iterative Mass Balance - Nodal Method)
+                    for(let iter=0; iter<1000; iter++) { // เพิ่มลูปให้ถึง 1000 เพื่อความเสถียร
+                        let maxRes = 0;
+                        nodes.forEach(n => {
+                            // ข้ามโหนดแหล่งน้ำ หรือ โหนดที่ถูกตัดขาดจากระบบ (Isolated Nodes)
+                            if(['reservoir','tank','pump'].includes(n.type) || !connectedNodes.has(n.id)) return;
+                            
+                            let sumQ = 0, sumDqDh = 0;
+
+                            links.filter(l => l.s === n.id || l.e === n.id).forEach(l => {
+                                const neighborId = l.s === n.id ? l.e : l.s;
+                                const nb = nodes.find(x => x.id === neighborId);
+                                
+                                // ตรวจสอบเปอร์เซ็นต์การเปิดวาล์ว
+                                let pct1 = n.type === 'valve' ? (n.openPercent !== undefined ? n.openPercent : (n.status === 'CLOSED' ? 0 : 100)) : 100;
+                                let pct2 = nb.type === 'valve' ? (nb.openPercent !== undefined ? nb.openPercent : (nb.status === 'CLOSED' ? 0 : 100)) : 100;
+                                
+                                if (pct1 === 0 || pct2 === 0) return; // วาล์วปิดสนิท (Flow = 0)
+                                
+                                const D = l.dia / 1000;
+                                const C = l.c || 140; 
+                                const len = Math.max(l.len, 0.1);
+                                
+                                // จำลอง Headloss จากการหรี่วาล์ว (Area Throttle Multiplier)
+                                let throttle = Math.min(pct1, pct2) / 100.0;
+                                let throttleMultiplier = Math.pow(1 / throttle, 2);
+                                
+                                // สมการ Hazen-Williams พร้อมตัวคูณความต้านทานจากการหรี่วาล์ว
+                                const K = (10.67 * len / (Math.pow(C, 1.852) * Math.pow(D, 4.8704))) * throttleMultiplier;
+                                
+                                let dH = nb.head - n.head;
+                                const sign = dH >= 0 ? 1 : -1;
+                                const absDH = Math.abs(dH);
+                                
+                                let Q = 0, dQdH = 0;
+                                const expQ = 1 / 1.852; // คงค่าเศษส่วนตามทฤษฎีไว้ตลอดการคำนวณ
+                                if (absDH > 1e-6) {
+                                    // Q = (dH / K)^(1/1.852)
+                                    Q = sign * Math.pow(absDH / K, expQ);
+                                    dQdH = expQ * Math.abs(Q) / absDH;
+                                }
+                                sumQ += Q; sumDqDh += dQdH;
+                            });
+
+                            const demM3s = (n.dem || 0) / 3600;
+                            const residual = sumQ - demM3s;
+                            if(Math.abs(residual) > maxRes) maxRes = Math.abs(residual);
+
+                            if(sumDqDh > 1e-10) {
+                                let dh = residual / sumDqDh;
+                                dh = Math.max(-10, Math.min(10, dh)); // limit step จาก 5 เป็น 10 ให้ลู่เข้าได้เสถียรขึ้น
+                                n.head += dh;
+                            }
+
+                            // สำหรับ PRV: ปรับสมดุลตามทฤษฎี โดยจำกัด Total Head ของ Node ไม่ให้เกิน Set Target 
+                            // ส่งผลให้อัตราการไหลของท่อที่อยู่ดาวน์สตรีมลดลงอย่างถูกต้อง
+                            if (n.type === 'prv') {
+                                const targetHead = n.el + (n.setting || 15);
+                                if (n.head > targetHead) {
+                                    n.head = targetHead; 
+                                }
+                            }
+                        });
+                        // ขยับจุด Tolerance ให้ละเอียดขึ้น 100 เท่า (อนุรักษ์มวลระดับ 1e-6 m3/s)
+                        if(maxRes < 1e-6) break; 
+                    }
+
+                    // คำนวณผลลัพธ์สุดท้าย (Flow, Vel, HL)
+                    let totD = 0, totS = 0, minP = 999;
+                    
+                    nodes.forEach(n => { 
+                        n.p = Math.max(0, n.head - n.el); // Pressure (m)
+                        if(n.dem) totD += n.dem;
+                        if (!['reservoir','tank','pump'].includes(n.type) && n.p < minP) minP = n.p;
+                    });
+                    
+                    links.forEach(l => {
+                        const n1 = nodes.find(x=>x.id===l.s), n2 = nodes.find(x=>x.id===l.e);
+                        
+                        let pct1 = n1.type === 'valve' ? (n1.openPercent !== undefined ? n1.openPercent : (n1.status === 'CLOSED' ? 0 : 100)) : 100;
+                        let pct2 = n2.type === 'valve' ? (n2.openPercent !== undefined ? n2.openPercent : (n2.status === 'CLOSED' ? 0 : 100)) : 100;
+                        
+                        const dH = n1.head - n2.head;
+                        const absDH = Math.abs(dH);
+                        const flowDirection = dH >= 0 ? 1 : -1;
+
+                        // ตรวจสอบว่าท่อถูกตัดขาดจากแหล่งน้ำหรือไม่
+                        const isIsolated = !connectedNodes.has(n1.id) || !connectedNodes.has(n2.id);
+
+                        if (pct1 === 0 || pct2 === 0 || isIsolated) {
+                            l.flow = 0;
+                            l.vel = 0;
+                            // ถ้าวาล์วปิดสนิท Headloss = แรงดันตกคร่อม, ถ้าแค่ท่อลอยๆ ถูกตัดขาด HL = 0
+                            l.hl = (pct1 === 0 || pct2 === 0) ? absDH : 0; 
+                        } else {
+                            const D = l.dia / 1000;
+                            const C = l.c || 140;
+                            const len = Math.max(l.len, 0.1);
+                            
+                            let throttle = Math.min(pct1, pct2) / 100.0;
+                            let throttleMultiplier = Math.pow(1 / throttle, 2);
+                            
+                            const K = (10.67 * len / (Math.pow(C, 1.852) * Math.pow(D, 4.8704))) * throttleMultiplier;
+                            const expQ = 1 / 1.852; 
+                            
+                            // แก้ไข: ใช้ 1/1.852 แทนที่ฮาร์ดโค้ด 0.54 เพื่อให้สมดุลมวล Continuity สมบูรณ์
+                            const Q_m3s = absDH > 1e-6 ? Math.pow(absDH / K, expQ) : 0;
+                            
+                            l.flow = Q_m3s * 3600 * flowDirection; // m3/h 
+                            l.vel = Q_m3s / (Math.PI * Math.pow(D/2, 2)) * flowDirection; // m/s
+                            l.hl = absDH; // Headloss (m)
+
+                            if(['reservoir','tank','pump'].includes(n1.type) && dH>0) totS += Math.abs(l.flow);
+                            if(['reservoir','tank','pump'].includes(n2.type) && dH<0) totS += Math.abs(l.flow);
+                        }
+                    });
+                    
+                    // แสดงผล Dashboard
+                    document.getElementById('val-supply').innerText = totS.toFixed(2) + ' m³/h';
+                    document.getElementById('val-demand').innerText = totD.toFixed(2) + ' m³/h';
+                    document.getElementById('val-min-p').innerText = ((minP === 999 ? 0 : minP) / 10.197).toFixed(2) + ' bar';
+                    document.getElementById('sysSummary').classList.add('show');
+
+                    isCalculated = true; render(); log("Done"); resolve();
+                }, 100);
+            });
+        }
+    </script>
+</body>
+</html>
